@@ -1,9 +1,11 @@
-import React, { useState, useEffect, useRef, useCallback, useContext } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useContext, useMemo } from 'react';
 import AppContext from './AppContext';
-import CONFIGURATION from "./config";
+import { getConfiguration } from "./config";
 
 const PaliTest = () => {
-  const { paliTestDisplay, paliDetected } = useContext(AppContext);
+  const { paliTestDisplay, paliDetected, useTestnet } = useContext(AppContext);
+
+  const CONFIGURATION = useMemo(() => getConfiguration(useTestnet), [useTestnet]);
 
   const [paliAccount, setPaliAccount] = useState(null);
   const [paliChainId, setPaliChainId] = useState(null);
@@ -17,6 +19,7 @@ const PaliTest = () => {
 
   const handleChainChanged = useCallback(async (chainIdHex) => {
     const pali = paliProviderRef.current;
+    if (!pali) return;
 
     setTimeout(() => { // <-- IMPORTANT! This delay ensures that the state gets fully updated
       if (chainIdHex) {
@@ -26,6 +29,7 @@ const PaliTest = () => {
         try {
           const networkOk = (currentChainIdNum === CONFIGURATION.ChainId) && pali.isBitcoinBased();
           setPaliNetworkOk(networkOk);
+          console.log(`[CHAIN CHANGED] Wallet Chain ID: ${currentChainIdNum}, Target Chain ID: ${CONFIGURATION.ChainId}. Network OK: ${networkOk}`);
 
           if (!networkOk) {
             setError(`Incorrect UTXO Network. Please switch to ${CONFIGURATION.ChainName}.`);
@@ -41,8 +45,8 @@ const PaliTest = () => {
         setPaliChainId(null);
         setPaliNetworkOk(false);
       }
-    }, paliProviderRef.current?.subVersion === 5 ? 0 : 100);
-  }, []);
+    }, 100);
+  }, [CONFIGURATION.ChainId, CONFIGURATION.ChainName]);
 
   const handleIsBitcoinBased = useCallback(async (isBitcoinBased) => {
     console.log("Pali 'handleIsBitcoinBased' event received:", isBitcoinBased);
@@ -75,21 +79,26 @@ const PaliTest = () => {
   const checkState = useCallback(async (pali) => {
     if (!pali) return;
     try {
-      const currentAccounts = await pali.request({
-        method: pali.isBitcoinBased() ? "sys_requestAccounts" : "eth_requestAccounts"
-      });
+      const isBitcoin = pali.isBitcoinBased();
+      handleIsBitcoinBased(isBitcoin);
+
+      const method = isBitcoin ? "sys_requestAccounts" : "eth_requestAccounts";
+      const currentAccounts = await pali.request({ method });
       handleAccountsChanged(currentAccounts);
 
-      handleLockStateChanged();
+      handleLockStateChanged(null, Array.isArray(currentAccounts) && currentAccounts.length > 0);
 
       handleIsBitcoinBased(pali.isBitcoinBased());
 
       const currentNetwork = await pali.request({ method: 'wallet_getNetwork' });
       setPaliChainId(currentNetwork.chainId);
-      handleChainChanged('0x' + currentNetwork.chainId.toString(16));
+      const chainId = '0x' + currentNetwork.chainId.toString(16);
+      handleChainChanged(chainId);
     } catch (err) {
+      console.error("Error during checkState, user may have disconnected or locked.", err);
       handleChainChanged(null);
       setPaliAccount(null);
+      setPaliIsLocked(true);
     }
   }, [handleLockStateChanged, handleChainChanged, handleIsBitcoinBased, handleAccountsChanged]);
 
@@ -119,16 +128,17 @@ const PaliTest = () => {
     pali.on('isBitcoinBased', handleIsBitcoinBased);
     pali.on('accountsChanged', handleAccountsChanged);
     pali.on('unlockStateChanged', handleLockStateChanged);
-    pali.on('unlockStateChanged', handleLockStateChanged);
 
     return () => {
       if (pali?.removeListener) {
         console.log('PaliTest: Removing listeners.');
+        pali.removeListener('unlockStateChanged', handleLockStateChanged);
         pali.removeListener('accountsChanged', handleAccountsChanged);
+        pali.removeListener('isBitcoinBased', handleIsBitcoinBased);
         pali.removeListener('chainChanged', handleChainChanged);
       }
     };
-  }, [paliTestDisplay, paliDetected, checkState, handleAccountsChanged, handleChainChanged, handleIsBitcoinBased, handleLockStateChanged]);
+  }, [paliTestDisplay, paliDetected, checkState, handleAccountsChanged, handleChainChanged, handleIsBitcoinBased, handleLockStateChanged, CONFIGURATION]);
 
   // --- USER ACTIONS ---
 
@@ -162,7 +172,7 @@ const PaliTest = () => {
       checkState(pali);
       setPaliIsLoading(false);
     }
-  }, [checkState]);
+  }, [checkState, CONFIGURATION.ChainId]);
 
   const handleSwitchAccount = useCallback(async () => {
     const pali = paliProviderRef.current;
