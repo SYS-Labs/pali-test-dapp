@@ -12,7 +12,7 @@ const PaliTest = () => {
   const [paliNetworkOk, setPaliNetworkOk] = useState(false);
   const [paliIsBitcoinBased, setPaliIsBitcoinBased] = useState(false);
   const [paliIsLoading, setPaliIsLoading] = useState(false); // Single loading state
-  const [paliIsLocked, setPaliIsLocked] = useState(false);
+  const [paliIsUnlocked, setPaliIsUnlocked] = useState(false);
   const [error, setError] = useState('');
 
   const paliProviderRef = useRef(null);
@@ -54,6 +54,7 @@ const PaliTest = () => {
   }, []);
 
   const handleLockStateChanged = useCallback(async (data, isUnlocked) => {
+    console.log("Pali 'handleLockStateChanged' event received:", [data, isUnlocked]);
     const pali = paliProviderRef.current;
 
     if (pali.isBitcoinBased()) {
@@ -62,7 +63,7 @@ const PaliTest = () => {
       const accounts = data;
     }
 
-    setPaliIsLocked(!isUnlocked);
+    setPaliIsUnlocked(isUnlocked);
   }, []);
 
   const handleAccountsChanged = useCallback(async (accounts) => {
@@ -86,7 +87,7 @@ const PaliTest = () => {
       const currentAccounts = await pali.request({ method });
       handleAccountsChanged(currentAccounts);
 
-      handleLockStateChanged(null, Array.isArray(currentAccounts) && currentAccounts.length > 0);
+      handleLockStateChanged(null, await pali.isUnlocked());
 
       handleIsBitcoinBased(pali.isBitcoinBased());
 
@@ -98,7 +99,7 @@ const PaliTest = () => {
       console.error("Error during checkState, user may have disconnected or locked.", err);
       handleChainChanged(null);
       setPaliAccount(null);
-      setPaliIsLocked(true);
+      setPaliIsUnlocked(null);
     }
   }, [handleLockStateChanged, handleChainChanged, handleIsBitcoinBased, handleAccountsChanged]);
 
@@ -108,7 +109,7 @@ const PaliTest = () => {
       setPaliAccount(null);
       setPaliChainId(null);
       setPaliNetworkOk(false);
-      setPaliIsLocked(null);
+      setPaliIsUnlocked(null);
       paliProviderRef.current = null;
       return;
     }
@@ -211,7 +212,7 @@ const PaliTest = () => {
             <div className="pali-status-row">
               <span className="pali-status-label">Locked:</span>
               <span className="pali-status-value pali-account-value">
-                {paliIsLocked ? (
+                {paliIsUnlocked ? (
                   <span className="text-success">No</span>
                 ) : (
                   <span className="text-danger">Yes</span>
