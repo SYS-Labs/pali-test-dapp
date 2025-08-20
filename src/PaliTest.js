@@ -157,9 +157,11 @@ const PaliTest = () => {
           params: [{ chainId: CONFIGURATION.ChainId }],
         });
       } else {
-        console.log(`The user should switch across UTXO networks manually`);
+        window.ethereum.request({
+          method: 'sys_switchChain',
+          params: [{ chainId: CONFIGURATION.ChainId }], // target UTXO chainId
+        });
       }
-
     } catch (err) {
       console.warn("sys_changeUTXOEVM failed, falling back to sys_requestAccounts.", err);
       try {
@@ -280,7 +282,7 @@ const PaliTest = () => {
             </button>
           )}
 
-          {paliDetected && paliAccount && !paliIsBitcoinBased && !paliNetworkOk && (
+          {paliDetected && paliAccount && !paliNetworkOk && (
             <button onClick={handleConnectAndSwitch} disabled={paliIsLoading} type="button" className="action-button btn-warning">
               {paliIsLoading ? "Switching..." : `Switch to ${CONFIGURATION.ChainName}`}
             </button>
