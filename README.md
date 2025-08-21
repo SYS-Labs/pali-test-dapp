@@ -8,9 +8,10 @@ This repository presents a concise yet complete React example that shows **how t
 
 * **Wallet detection** – A polling routine looks for `window.pali`, guaranteeing the DApp never accesses the provider before the extension is ready.
 * **State tracking** – Real-time indicators include lock status, wallet mode (UTXO / EVM), active account, current chain ID, and whether the user is already on the intended Syscoin network.
-* **Connection and network switching** – The sample invokes `sys_requestAccounts` to request access and, when required, calls `sys_changeUTXOEVM` to guide the user onto the correct UTXO chain.
-* **Event handling** – Listeners for `chainChanged`, `accountsChanged`, `isBitcoinBased`, and `unlockStateChanged` are __registered and cleaned up in a carefully ordered `useEffect` to avoid race conditions__.
-* **Environment configuration** – A single flag in `.env` toggles between Mainnet and Tanenbaum Testnet, keeping deployments predictable.
+* **Connection and network switching** – The sample invokes `sys_requestAccounts` to request access and uses Syscoin-specific RPC methods (`sys_changeUTXOEVM`, `sys_switchChain`) to guide the user onto the correct UTXO chain.
+* **Account switching** – A dedicated button calls `wallet_changeAccount`, allowing users to easily switch between their available accounts within Pali.
+* **Event handling** – Listeners for `chainChanged`, `accountsChanged`, `isBitcoinBased`, and `unlockStateChanged` are registered and cleaned up in a carefully ordered `useEffect` to avoid race conditions.
+* **Dynamic network configuration** – A UI toggle allows switching between Mainnet and Testnet. The user's choice is persisted in `localStorage`, while the `.env` file sets the initial default.
 * **Modern React tooling** – Create React App is extended with **CRACO** to restore Node-style polyfills (`buffer`, `stream`) expected by many web3 libraries.
 
 ---
@@ -47,7 +48,7 @@ This repository presents a concise yet complete React example that shows **how t
    Then edit `.env` and set
 
    ```text
-   # Tanenbaum Testnet
+   # Syscoin Testnet
    REACT_APP_USE_TESTNET=true
    # — or —
    # Syscoin Mainnet
@@ -82,9 +83,9 @@ React hooks coordinate state:
 
 `PaliTest.js` attaches listeners for wallet events. Because certain events may not fire consistently, the helper `checkState` refreshes the UI after critical actions, ensuring accuracy even when the extension is silent.
 
-### 4 · Network Switching (`sys_changeUTXOEVM`)
+### 4 · Network & Account Switching
 
-`handleConnectAndSwitch` verifies whether the wallet is in EVM mode (`pali.isBitcoinBased()`). If so, it programmatically suggests the corresponding UTXO chain through the Syscoin-specific RPC method, streamlining the user’s path to the correct network.
+The `handleConnectAndSwitch` function contains logic to intelligently guide the user. It checks if the wallet is already on a UTXO-based chain and calls the appropriate RPC method (`sys_switchChain` or `sys_changeUTXOEVM`) to switch to the target network. A separate `handleSwitchAccount` function calls `wallet_changeAccount` to open Pali's account selection dialog.
 
 ---
 
